@@ -1,28 +1,44 @@
 <?php
-require_once '../config/database.php';
-require_once '../classes/University.php';
+require_once __DIR__ . '/../includes/auth.php';
+checkAdmin();
 
-$university = new University($conn);
+require_once __DIR__ . '/../classes/Course.php';
+require_once __DIR__ . '/../classes/Department.php';
+
+$course = new Course();
+$dept = new Department();
+
 $error_message = "";
 
-// معالجة إضافة مادة جديدة
+// جلب البيانات
+$courses = $course->getAll();
+$departments = $dept->getAll();
+
+// إحصائيات
+$stats = [
+    'courses' => count($courses),
+    'departments' => count($departments),
+    'credit_hours' => 0
+];
+
+foreach ($courses as $c) {
+    $stats['credit_hours'] += ($c['credit_hours'] ?? 3);
+}
+
+// معالجة إضافة مادة
 if (isset($_POST['save_course'])) {
-    $name = htmlspecialchars(trim($_POST['name']));
-    $code = htmlspecialchars(trim($_POST['code']));
-    $desc = htmlspecialchars(trim($_POST['desc']));
-    $dept_id = (int)$_POST['dept_id'];
+    $name = trim($_POST['name']);
+    $code = trim($_POST['code']);
+    $description = trim($_POST['desc']);
+    $department_id = (int)$_POST['dept_id'];
     $credit_hours = (int)$_POST['credit_hours'];
     
-    if(!empty($name) && !empty($code) && $dept_id > 0) {
-        if (!$university->isCodeExists($code)) {
-            if($university->addCourse($name, $code, $desc, $dept_id, $credit_hours)) {
-                header("Location: manage_courses.php?status=success");
-                exit();
-            } else {
-                $error_message = "حدث خطأ أثناء إضافة المادة!";
-            }
+    if (!empty($name) && !empty($code) && $department_id > 0) {
+        if ($course->create($department_id, $name, $code, $description)) {
+            header("Location: manage_courses.php?status=success");
+            exit();
         } else {
-            $error_message = "عذراً، كود المادة ($code) مسجل مسبقاً في النظام!";
+            $error_message = "كود المادة موجود مسبقاً!";
         }
     } else {
         $error_message = "الرجاء ملء جميع الحقول المطلوبة!";
@@ -31,16 +47,20 @@ if (isset($_POST['save_course'])) {
 
 // معالجة الحذف
 if (isset($_GET['del'])) {
-    $university->deleteCourse((int)$_GET['del']);
+    $course->delete((int)$_GET['del']);
     header("Location: manage_courses.php?status=deleted");
     exit();
 }
 
-// جلب البيانات
-$depts = $university->getDepartments();
-$courses = $university->getCourses("");
-$stats = $university->getStats();
-$deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات البيانية
+// بيانات الرسم البياني
+$deptStats = [];
+foreach ($departments as $d) {
+    $coursesInDept = $course->getByDepartment($d['id']);
+    $deptStats[] = [
+        'name' => $d['name'],
+        'count' => count($coursesInDept)
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -127,17 +147,12 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
         }
         .dark-mode-btn:hover { transform: scale(1.1); }
         
-        body.dark-mode .bg-amber-100 { background-color: #451a03 !important; color: #fbbf24 !important; }
-        body.dark-mode .bg-green-100 { background-color: #064e3b !important; color: #34d399 !important; }
-        
-        /* تحسينات الأزرار */
         .action-btn {
             transition: all 0.2s ease;
             cursor: pointer;
         }
         .action-btn:hover { transform: translateY(-2px); }
         
-        /* شريط التمرير للجدول */
         .table-container {
             max-height: 500px;
             overflow-y: auto;
@@ -155,7 +170,6 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
             border-radius: 10px;
         }
         
-        /* تأثيرات التحويم */
         .stat-card {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -164,7 +178,6 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
             box-shadow: var(--shadow-lg);
         }
         
-        /* مودال مخصص */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -188,7 +201,6 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
             border: 1px solid var(--border);
         }
         
-        /* تحسين الجدول القابل للفرز */
         .sortable-header {
             cursor: pointer;
             user-select: none;
@@ -212,13 +224,13 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
 <body class="p-4 md:p-8">
 
     <div class="max-w-7xl mx-auto">
-        <!-- Header مع أزرار إضافية -->
+        <!-- Header -->
         <div class="rounded-3xl shadow-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-center border" style="background-color: var(--card-bg); border-color: var(--border);">
             <div>
                 <h1 class="text-3xl font-black bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
                     🏫 جامعة برج العرب التكنولوجية
                 </h1>
-                <p class="mt-1" style="color: var(--text-secondary);">نظام إدارة المواد الدراسية | <span style="color: #3b82f6;" class="font-bold">Abd El-Rahman Ali</span></p>
+                <p class="mt-1" style="color: var(--text-secondary);">نظام إدارة المواد الدراسية</p>
             </div>
             <div class="flex gap-3 mt-4 md:mt-0 flex-wrap justify-center">
                 <button onclick="openChartModal()" class="bg-purple-600 text-white px-5 py-2 rounded-2xl font-bold hover:bg-purple-700 transition shadow-md text-sm action-btn">
@@ -235,6 +247,9 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
                 </button>
                 <a href="view_departments.php" class="bg-indigo-600 text-white px-5 py-2 rounded-2xl font-bold hover:bg-indigo-700 transition shadow-md text-sm action-btn inline-block">
                     🏛️ البرامج
+                </a>
+                <a href="admin_dashboard.php" class="bg-blue-600 text-white px-5 py-2 rounded-2xl font-bold hover:bg-blue-700 transition shadow-md text-sm action-btn inline-block">
+                    ⬅️ العودة
                 </a>
             </div>
         </div>
@@ -278,8 +293,8 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
                         <div><label class="block text-sm font-bold mb-2" style="color: var(--text-secondary);">البرنامج التكنولوجي *</label>
                             <select name="dept_id" required class="w-full px-4 py-3 rounded-xl border focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
                                 <option value="">-- اختر البرنامج --</option>
-                                <?php foreach($depts as $d): ?>
-                                    <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['dept_name']) ?></option>
+                                <?php foreach($departments as $d): ?>
+                                    <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -294,7 +309,7 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
                 </div>
             </div>
 
-            <!-- Courses Table with Filters -->
+            <!-- Courses Table -->
             <div class="lg:col-span-2">
                 <div class="rounded-3xl shadow-lg overflow-hidden border" style="background-color: var(--card-bg); border-color: var(--border);">
                     <div class="p-6 border-b" style="background-color: var(--card-bg-2); border-color: var(--border);">
@@ -303,8 +318,8 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
                             <div class="flex gap-3 flex-wrap">
                                 <select id="deptFilter" class="px-3 py-2 rounded-xl border text-sm">
                                     <option value="all">📌 جميع البرامج</option>
-                                    <?php foreach($depts as $d): ?>
-                                        <option value="<?= htmlspecialchars($d['dept_name']) ?>"><?= htmlspecialchars($d['dept_name']) ?></option>
+                                    <?php foreach($departments as $d): ?>
+                                        <option value="<?= htmlspecialchars($d['name']) ?>"><?= htmlspecialchars($d['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                                 <select id="hoursFilter" class="px-3 py-2 rounded-xl border text-sm">
@@ -332,11 +347,11 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
                             </thead>
                             <tbody id="coursesTableBody" class="divide-y" style="border-color: var(--border);">
                                 <?php foreach($courses as $c): ?>
-                                <tr class="course-row hover:bg-blue-50/40 transition" data-code="<?= htmlspecialchars($c['code']) ?>" data-name="<?= htmlspecialchars($c['name']) ?>" data-dept="<?= htmlspecialchars($c['dept_name']) ?>" data-hours="<?= $c['credit_hours'] ?>">
+                                <tr class="course-row hover:bg-blue-50/40 transition" data-code="<?= htmlspecialchars($c['code']) ?>" data-name="<?= htmlspecialchars($c['name']) ?>" data-dept="<?= htmlspecialchars($c['department_name']) ?>" data-hours="<?= $c['credit_hours'] ?? 3 ?>">
                                     <td class="p-4 font-mono font-bold text-blue-600 text-sm"><?= htmlspecialchars($c['code']) ?></td>
                                     <td class="p-4 font-bold" style="color: var(--text-primary);"><?= htmlspecialchars($c['name']) ?></td>
-                                    <td class="p-4 text-sm" style="color: var(--text-secondary);"><?= htmlspecialchars($c['dept_name']) ?></td>
-                                    <td class="p-4 text-center"><span class="inline-block px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold"><?= $c['credit_hours'] ?> س</span></td>
+                                    <td class="p-4 text-sm" style="color: var(--text-secondary);"><?= htmlspecialchars($c['department_name']) ?></td>
+                                    <td class="p-4 text-center"><span class="inline-block px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold"><?= $c['credit_hours'] ?? 3 ?> س</span></td>
                                     <td class="p-4 text-center"><div class="flex justify-center gap-3"><a href="edit_course.php?id=<?= $c['id'] ?>" class="text-blue-500 hover:text-blue-700 font-bold text-sm">✏️ تعديل</a><button onclick="confirmDelete(<?= $c['id'] ?>)" class="text-red-400 hover:text-red-600 font-bold text-sm">🗑️ حذف</button></div></td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -379,7 +394,7 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
     <button class="dark-mode-btn" id="darkModeToggle" title="تبديل الوضع المظلم">🌙</button>
 
     <script>
-        // ========== Dark Mode ==========
+        // Dark Mode
         function setDarkMode(isDark) {
             if (isDark) {
                 document.body.classList.add('dark-mode');
@@ -396,7 +411,7 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
         else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setDarkMode(true);
         document.getElementById('darkModeToggle').addEventListener('click', () => setDarkMode(!document.body.classList.contains('dark-mode')));
 
-        // ========== Data Management ==========
+        // Data Management
         let allRows = [];
         let currentPage = 1;
         const rowsPerPage = 10;
@@ -499,8 +514,8 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
         });
         
         collectRows();
-        
-        // ========== Export Functions ==========
+
+        // Export Functions
         function exportToExcel() {
             const table = document.getElementById('coursesTable');
             const ws = XLSX.utils.table_to_sheet(table);
@@ -518,7 +533,6 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
         
         function printTable() {
             const printContent = document.getElementById('coursesTable').outerHTML;
-            const originalTitle = document.title;
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
                 <html dir="rtl"><head><title>قائمة المواد الدراسية</title>
@@ -528,8 +542,8 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
             printWindow.document.close();
             printWindow.print();
         }
-        
-        // ========== Chart Modal ==========
+
+        // Chart Modal
         let chartInstance = null;
         
         function openChartModal() {
@@ -539,35 +553,61 @@ $deptStats = $university->getCoursesByDepartmentStats(); // للإحصائيات
             const ctx = document.getElementById('deptChart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
             
-            fetch('get_chart_data.php')
-                .then(res => res.json())
-                .then(data => {
-                    chartInstance = new Chart(ctx, {
-                        type: 'bar',
-                        data: { labels: data.labels, datasets: [{ label: 'عدد المواد', data: data.values, backgroundColor: 'rgba(99, 102, 241, 0.7)', borderRadius: 10 }] },
-                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top', labels: { font: { family: 'Tajawal' } } } }, scales: { y: { beginAtZero: true, grid: { color: document.body.classList.contains('dark-mode') ? '#334155' : '#e2e8f0' } }, x: { ticks: { font: { family: 'Tajawal' } } } } }
-                    });
-                });
+            const data = {
+                labels: <?= json_encode(array_column($deptStats, 'name')) ?>,
+                values: <?= json_encode(array_column($deptStats, 'count')) ?>
+            };
+            
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { 
+                    labels: data.labels, 
+                    datasets: [{ 
+                        label: 'عدد المواد', 
+                        data: data.values, 
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)', 
+                        borderRadius: 10 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: true, 
+                    plugins: { 
+                        legend: { 
+                            position: 'top', 
+                            labels: { font: { family: 'Tajawal' } } 
+                        } 
+                    }, 
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: document.body.classList.contains('dark-mode') ? '#334155' : '#e2e8f0' } 
+                        }, 
+                        x: { 
+                            ticks: { font: { family: 'Tajawal' } } 
+                        } 
+                    } 
+                }
+            });
         }
         
         function closeChartModal() { document.getElementById('chartModal').style.display = 'none'; }
         
-        // ========== Delete Confirmation ==========
+        document.getElementById('chartModal').addEventListener('click', function(e) { if (e.target === this) closeChartModal(); });
+
+        // Delete Confirmation
         function confirmDelete(id) {
             Swal.fire({
                 title: 'هل أنت متأكد؟', text: "لا يمكن استعادة المادة بعد الحذف!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#ef4444', confirmButtonText: 'نعم، احذف', cancelButtonText: 'إلغاء',
                 background: document.body.classList.contains('dark-mode') ? '#1e293b' : '#ffffff', color: document.body.classList.contains('dark-mode') ? '#f1f5f9' : '#1e293b'
             }).then((result) => { if (result.isConfirmed) window.location.href = 'manage_courses.php?del=' + id; });
         }
-        
-        // ========== Success Messages ==========
+
+        // Success Messages
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('status') === 'success') Swal.fire('تم الإضافة', 'تمت إضافة المادة بنجاح', 'success');
         else if (urlParams.get('status') === 'deleted') Swal.fire('تم الحذف', 'تم حذف المادة بنجاح', 'success');
         else if (urlParams.get('status') === 'updated') Swal.fire('تم التحديث', 'تم تعديل المادة بنجاح', 'success');
-        
-        // Close modal on outside click
-        document.getElementById('chartModal').addEventListener('click', function(e) { if (e.target === this) closeChartModal(); });
     </script>
 </body>
 </html>

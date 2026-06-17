@@ -1,24 +1,18 @@
 <?php
-/**
- * صفحة إدارة الأخبار والإعلانات (News) — للأدمن فقط
- * عمليات CRUD: إضافة، عرض، تعديل، حذف
- * created_by مربوط بالأدمن الذي نشر الخبر من الـ Session
- */
-
 require_once __DIR__ . '/../includes/auth.php';
 checkAdmin();
 
 require_once __DIR__ . '/../classes/News.php';
 $news = new News();
 
-$error    = '';
-$success  = '';
+$error = '';
+$success = '';
 $editData = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'create') {
-        $title      = trim($_POST['title'] ?? '');
-        $content    = trim($_POST['content'] ?? '');
+        $title = trim($_POST['title'] ?? '');
+        $content = trim($_POST['content'] ?? '');
         $created_by = $_SESSION['user_id'];
 
         if (empty($title) || empty($content)) {
@@ -33,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (isset($_POST['action']) && $_POST['action'] === 'update') {
-        $id      = (int) $_POST['id'];
-        $title   = trim($_POST['title'] ?? '');
+        $id = (int) $_POST['id'];
+        $title = trim($_POST['title'] ?? '');
         $content = trim($_POST['content'] ?? '');
 
         if (empty($title) || empty($content)) {

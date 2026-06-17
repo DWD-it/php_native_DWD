@@ -1,9 +1,19 @@
 <?php
-require_once '../config/database.php';
-require_once '../classes/University.php';
+require_once __DIR__ . '/../includes/auth.php';
+checkStudent();
 
-$university = new University($conn);
-$departments = $university->getDepartments();
+require_once __DIR__ . '/../classes/Department.php';
+require_once __DIR__ . '/../classes/Course.php';
+
+$dept = new Department();
+$course = new Course();
+
+$departments = $dept->getAll();
+
+foreach ($departments as &$d) {
+    $courses = $course->getByDepartment($d['id']);
+    $d['courses_count'] = count($courses);
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -16,7 +26,6 @@ $departments = $university->getDepartments();
     <style>
         body { font-family: 'Tajawal', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
         
-        /* ========== الوضع الفاتح (الافتراضي) ========== */
         :root {
             --bg-from: #f8fafc;
             --bg-to: #f1f5f9;
@@ -32,7 +41,6 @@ $departments = $university->getDepartments();
             --gradient-header: linear-gradient(135deg, #4338ca, #3730a3);
         }
         
-        /* ========== الوضع المظلم ========== */
         body.dark-mode {
             --bg-from: #0f172a;
             --bg-to: #1e293b;
@@ -53,69 +61,13 @@ $departments = $university->getDepartments();
             min-height: 100vh;
         }
         
-        /* تطبيق المتغيرات */
-        .bg-white {
-            background-color: var(--card-bg) !important;
-        }
+        .bg-white { background-color: var(--card-bg) !important; }
+        .text-slate-700, .text-slate-800, h1, h3 { color: var(--text-primary) !important; }
+        .text-slate-500, .text-slate-400 { color: var(--text-secondary) !important; }
+        .border-slate-100 { border-color: var(--border) !important; }
+        .bg-slate-50 { background-color: var(--card-bg-2) !important; }
+        .hover\:bg-indigo-50:hover { background-color: var(--hover-bg) !important; }
         
-        .text-slate-700, .text-slate-800, h1, h3 {
-            color: var(--text-primary) !important;
-        }
-        
-        .text-slate-500, .text-slate-400 {
-            color: var(--text-secondary) !important;
-        }
-        
-        .border-slate-100 {
-            border-color: var(--border) !important;
-        }
-        
-        .bg-slate-50 {
-            background-color: var(--card-bg-2) !important;
-        }
-        
-        .hover\:bg-indigo-50:hover {
-            background-color: var(--hover-bg) !important;
-        }
-        
-        .bg-indigo-100 {
-            background-color: #e0e7ff !important;
-        }
-        body.dark-mode .bg-indigo-100 {
-            background-color: #312e81 !important;
-        }
-        
-        .bg-green-100 {
-            background-color: #dcfce7 !important;
-        }
-        body.dark-mode .bg-green-100 {
-            background-color: #064e3b !important;
-        }
-        
-        .text-green-700 {
-            color: #15803d !important;
-        }
-        body.dark-mode .text-green-700 {
-            color: #34d399 !important;
-        }
-        
-        .text-indigo-600 {
-            color: #4f46e5 !important;
-        }
-        body.dark-mode .text-indigo-600 {
-            color: #a5b4fc !important;
-        }
-        
-        .text-indigo-200 {
-            color: #c7d2fe !important;
-        }
-        
-        /* رأس الصفحة في الوضع المظلم */
-        body.dark-mode .bg-gradient-to-r {
-            background: var(--gradient-header) !important;
-        }
-        
-        /* زر تبديل الوضع المظلم */
         .dark-mode-btn {
             position: fixed;
             bottom: 25px;
@@ -134,42 +86,21 @@ $departments = $university->getDepartments();
             border: none;
             font-size: 28px;
         }
-        .dark-mode-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        }
+        .dark-mode-btn:hover { transform: scale(1.1); }
         
-        /* تحسين الروابط */
-        a:not(.dark-mode-btn) {
-            color: #2563eb;
-        }
-        body.dark-mode a:not(.dark-mode-btn) {
-            color: #60a5fa;
-        }
-        a:hover:not(.dark-mode-btn) {
-            color: #1d4ed8;
-        }
-        body.dark-mode a:hover:not(.dark-mode-btn) {
-            color: #93c5fd;
-        }
+        a:not(.dark-mode-btn) { color: #2563eb; }
+        body.dark-mode a:not(.dark-mode-btn) { color: #60a5fa; }
+        a:hover:not(.dark-mode-btn) { color: #1d4ed8; }
         
-        /* تحسين البطاقات */
-        .rounded-xl {
-            background-color: var(--card-bg-2);
-            border: 1px solid var(--border);
-        }
-        
-        /* تحسين الشادو */
-        .shadow-xl {
-            box-shadow: var(--shadow-xl);
-        }
+        .rounded-xl { background-color: var(--card-bg-2); border: 1px solid var(--border); }
+        .shadow-xl { box-shadow: var(--shadow-xl); }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
 
     <div class="max-w-5xl mx-auto">
-        <a href="manage_courses.php" class="inline-flex items-center gap-2 font-bold mb-6 hover:opacity-80 transition">
-            ← العودة إلى المواد الدراسية
+        <a href="student_dashboard.php" class="inline-flex items-center gap-2 font-bold mb-6 hover:opacity-80 transition">
+            ← العودة إلى لوحة التحكم
         </a>
 
         <div class="rounded-3xl shadow-xl overflow-hidden" style="background-color: var(--card-bg);">
@@ -195,7 +126,7 @@ $departments = $university->getDepartments();
                                         #<?= str_pad($dept['id'], 2, '0', STR_PAD_LEFT) ?>
                                     </div>
                                     <div>
-                                        <h3 class="font-bold text-lg" style="color: var(--text-primary);"><?= htmlspecialchars($dept['dept_name']) ?></h3>
+                                        <h3 class="font-bold text-lg" style="color: var(--text-primary);"><?= htmlspecialchars($dept['name']) ?></h3>
                                         <p class="text-sm" style="color: var(--text-secondary);">
                                             📚 عدد المواد: <?= $dept['courses_count'] ?>
                                         </p>
@@ -219,13 +150,12 @@ $departments = $university->getDepartments();
         </div>
     </div>
 
-    <!-- زر تبديل الوضع المظلم -->
+    <!-- Dark Mode Button -->
     <button class="dark-mode-btn" id="darkModeToggle" title="تبديل الوضع المظلم">
         🌙
     </button>
 
     <script>
-        // ========== Dark Mode Functionality ==========
         function setDarkMode(isDark) {
             if (isDark) {
                 document.body.classList.add('dark-mode');
@@ -240,16 +170,10 @@ $departments = $university->getDepartments();
             }
         }
         
-        // التحقق من الوضع المحفوظ
-        if (localStorage.getItem('darkMode') === 'enabled') {
-            setDarkMode(true);
-        } else if (localStorage.getItem('darkMode') === 'disabled') {
-            setDarkMode(false);
-        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setDarkMode(true);
-        }
+        if (localStorage.getItem('darkMode') === 'enabled') setDarkMode(true);
+        else if (localStorage.getItem('darkMode') === 'disabled') setDarkMode(false);
+        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setDarkMode(true);
         
-        // حدث الضغط على الزر
         document.getElementById('darkModeToggle').addEventListener('click', function() {
             const isDark = document.body.classList.contains('dark-mode');
             setDarkMode(!isDark);

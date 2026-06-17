@@ -1,48 +1,41 @@
 <?php
-require_once '../config/database.php';
-require_once '../classes/University.php';
+require_once __DIR__ . '/../includes/auth.php';
+checkAdmin();
 
-$university = new University($conn);
-$error_message = "";
+require_once __DIR__ . '/../classes/Course.php';
+require_once __DIR__ . '/../classes/Department.php';
 
-// التحقق من وجود ID
-if (!isset($_GET['id']) || empty($_GET['id'])) {
-    header("Location: manage_courses.php");
-    exit();
-}
+$course = new Course();
+$dept = new Department();
 
 $course_id = (int)$_GET['id'];
-$course_data = $university->getCourseById($course_id);
+$course_data = $course->getById($course_id);
+$departments = $dept->getAll();
 
 if (!$course_data) {
     die("<div class='p-8 text-center text-red-600 font-bold'>⚠️ المادة غير موجودة!</div>");
 }
 
-// معالجة التحديث
-if (isset($_POST['update_course'])) {
-    $name = htmlspecialchars(trim($_POST['name']));
-    $code = htmlspecialchars(trim($_POST['code']));
-    $desc = htmlspecialchars(trim($_POST['desc']));
-    $dept_id = (int)$_POST['dept_id'];
-    $credit_hours = (int)$_POST['credit_hours'];
+$error_message = "";
 
-    if (!empty($name) && !empty($code) && $dept_id > 0) {
-        if (!$university->isCodeExists($code, $course_id)) {
-            if ($university->updateCourse($course_id, $name, $code, $desc, $dept_id, $credit_hours)) {
-                header("Location: manage_courses.php?status=updated");
-                exit();
-            } else {
-                $error_message = "حدث خطأ أثناء تحديث المادة!";
-            }
+if (isset($_POST['update_course'])) {
+    $name = trim($_POST['name']);
+    $code = trim($_POST['code']);
+    $description = trim($_POST['desc']);
+    $department_id = (int)$_POST['dept_id'];
+    $credit_hours = (int)$_POST['credit_hours'];
+    
+    if (!empty($name) && !empty($code) && $department_id > 0) {
+        if ($course->update($course_id, $department_id, $name, $code, $description)) {
+            header("Location: manage_courses.php?status=updated");
+            exit();
         } else {
-            $error_message = "عذراً، هذا الكود ($code) مستخدم لمادة أخرى!";
+            $error_message = "حدث خطأ أثناء تحديث المادة!";
         }
     } else {
         $error_message = "الرجاء ملء جميع الحقول المطلوبة!";
     }
 }
-
-$depts = $university->getDepartments();
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -56,7 +49,6 @@ $depts = $university->getDepartments();
     <style>
         body { font-family: 'Tajawal', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
         
-        /* ========== الوضع الفاتح (الافتراضي) ========== */
         :root {
             --bg-from: #f8fafc;
             --bg-to: #f1f5f9;
@@ -70,7 +62,6 @@ $depts = $university->getDepartments();
             --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1);
         }
         
-        /* ========== الوضع المظلم ========== */
         body.dark-mode {
             --bg-from: #0f172a;
             --bg-to: #1e293b;
@@ -89,41 +80,17 @@ $depts = $university->getDepartments();
             min-height: 100vh;
         }
         
-        /* تطبيق المتغيرات */
-        .bg-white {
-            background-color: var(--card-bg) !important;
-        }
-        
-        .text-slate-600, .text-slate-700, .text-slate-800 {
-            color: var(--text-primary) !important;
-        }
-        
-        .text-slate-500, .text-slate-400 {
-            color: var(--text-secondary) !important;
-        }
-        
-        .border-slate-100, .border-slate-200 {
-            border-color: var(--border) !important;
-        }
-        
+        .bg-white { background-color: var(--card-bg) !important; }
+        .text-slate-600, .text-slate-700, .text-slate-800 { color: var(--text-primary) !important; }
+        .text-slate-500, .text-slate-400 { color: var(--text-secondary) !important; }
+        .border-slate-100, .border-slate-200 { border-color: var(--border) !important; }
         input, select, textarea {
             background-color: var(--input-bg) !important;
             color: var(--text-primary) !important;
             border-color: var(--border) !important;
         }
+        input::placeholder, textarea::placeholder { color: var(--text-muted) !important; }
         
-        input::placeholder, textarea::placeholder {
-            color: var(--text-muted) !important;
-        }
-        
-        .bg-red-50 {
-            background-color: #fee2e2 !important;
-        }
-        body.dark-mode .bg-red-50 {
-            background-color: #450a0a !important;
-        }
-        
-        /* زر تبديل الوضع المظلم */
         .dark-mode-btn {
             position: fixed;
             bottom: 25px;
@@ -142,49 +109,21 @@ $depts = $university->getDepartments();
             border: none;
             font-size: 28px;
         }
-        .dark-mode-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        }
+        .dark-mode-btn:hover { transform: scale(1.1); }
         
-        /* تحسين الروابط */
-        a {
-            color: #2563eb;
-        }
-        body.dark-mode a {
-            color: #60a5fa;
-        }
-        a:hover {
-            color: #1d4ed8;
-        }
+        a { color: #2563eb; }
+        body.dark-mode a { color: #60a5fa; }
+        a:hover { color: #1d4ed8; }
         
-        /* تحسين الظلال */
-        .shadow-xl {
-            box-shadow: var(--shadow-xl);
-        }
+        .shadow-xl { box-shadow: var(--shadow-xl); }
         
-        /* تحسين زر الحفظ */
-        .btn-save {
-            background-color: #2563eb;
-        }
-        body.dark-mode .btn-save {
-            background-color: #1d4ed8;
-        }
-        .btn-save:hover {
-            background-color: #1d4ed8;
-        }
-        body.dark-mode .btn-save:hover {
-            background-color: #1e40af;
-        }
+        .btn-save { background-color: #2563eb; }
+        body.dark-mode .btn-save { background-color: #1d4ed8; }
+        .btn-save:hover { background-color: #1d4ed8; }
+        body.dark-mode .btn-save:hover { background-color: #1e40af; }
         
-        /* تحسين زر الإلغاء */
-        .btn-cancel {
-            background-color: #f1f5f9;
-        }
-        body.dark-mode .btn-cancel {
-            background-color: #334155;
-            color: #94a3b8;
-        }
+        .btn-cancel { background-color: #f1f5f9; }
+        body.dark-mode .btn-cancel { background-color: #334155; color: #94a3b8; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -222,9 +161,9 @@ $depts = $university->getDepartments();
                 <div>
                     <label class="block text-sm font-bold mb-2" style="color: var(--text-secondary);">البرنامج التكنولوجي *</label>
                     <select name="dept_id" required class="w-full px-4 py-3 rounded-xl border focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                        <?php foreach($depts as $d): ?>
-                            <option value="<?= $d['id'] ?>" <?= ($d['id'] == $course_data['dept_id']) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($d['dept_name']) ?>
+                        <?php foreach($departments as $d): ?>
+                            <option value="<?= $d['id'] ?>" <?= ($d['id'] == $course_data['department_id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($d['name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -233,11 +172,11 @@ $depts = $university->getDepartments();
                 <div>
                     <label class="block text-sm font-bold mb-2" style="color: var(--text-secondary);">عدد الساعات المعتمدة</label>
                     <select name="credit_hours" class="w-full px-4 py-3 rounded-xl border focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                        <option value="1" <?= $course_data['credit_hours'] == 1 ? 'selected' : '' ?>>1 ساعة</option>
-                        <option value="2" <?= $course_data['credit_hours'] == 2 ? 'selected' : '' ?>>2 ساعات</option>
-                        <option value="3" <?= $course_data['credit_hours'] == 3 ? 'selected' : '' ?>>3 ساعات</option>
-                        <option value="4" <?= $course_data['credit_hours'] == 4 ? 'selected' : '' ?>>4 ساعات</option>
-                        <option value="6" <?= $course_data['credit_hours'] == 6 ? 'selected' : '' ?>>6 ساعات</option>
+                        <option value="1" <?= ($course_data['credit_hours'] ?? 3) == 1 ? 'selected' : '' ?>>1 ساعة</option>
+                        <option value="2" <?= ($course_data['credit_hours'] ?? 3) == 2 ? 'selected' : '' ?>>2 ساعات</option>
+                        <option value="3" <?= ($course_data['credit_hours'] ?? 3) == 3 ? 'selected' : '' ?>>3 ساعات</option>
+                        <option value="4" <?= ($course_data['credit_hours'] ?? 3) == 4 ? 'selected' : '' ?>>4 ساعات</option>
+                        <option value="6" <?= ($course_data['credit_hours'] ?? 3) == 6 ? 'selected' : '' ?>>6 ساعات</option>
                     </select>
                 </div>
 
@@ -258,13 +197,12 @@ $depts = $university->getDepartments();
         </div>
     </div>
 
-    <!-- زر تبديل الوضع المظلم -->
+    <!-- Dark Mode Button -->
     <button class="dark-mode-btn" id="darkModeToggle" title="تبديل الوضع المظلم">
         🌙
     </button>
 
     <script>
-        // ========== Dark Mode Functionality ==========
         function setDarkMode(isDark) {
             if (isDark) {
                 document.body.classList.add('dark-mode');
@@ -279,32 +217,14 @@ $depts = $university->getDepartments();
             }
         }
         
-        // التحقق من الوضع المحفوظ
-        if (localStorage.getItem('darkMode') === 'enabled') {
-            setDarkMode(true);
-        } else if (localStorage.getItem('darkMode') === 'disabled') {
-            setDarkMode(false);
-        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setDarkMode(true);
-        }
+        if (localStorage.getItem('darkMode') === 'enabled') setDarkMode(true);
+        else if (localStorage.getItem('darkMode') === 'disabled') setDarkMode(false);
+        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setDarkMode(true);
         
-        // حدث الضغط على الزر
         document.getElementById('darkModeToggle').addEventListener('click', function() {
             const isDark = document.body.classList.contains('dark-mode');
             setDarkMode(!isDark);
         });
-
-        // رسائل النجاح
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('status') === 'updated') {
-            Swal.fire({
-                title: 'تم التحديث',
-                text: 'تم تعديل المادة بنجاح',
-                icon: 'success',
-                background: document.body.classList.contains('dark-mode') ? '#1e293b' : '#ffffff',
-                color: document.body.classList.contains('dark-mode') ? '#f1f5f9' : '#1e293b'
-            });
-        }
     </script>
 </body>
 </html>
