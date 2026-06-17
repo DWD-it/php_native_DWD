@@ -1,80 +1,37 @@
--- =============================================
--- University Portal System — Database Schema
--- Web Development II Project
--- =============================================
+-- إنشاء قاعدة البيانات
+CREATE DATABASE IF NOT EXISTS `university_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `university_db`;
 
--- إنشاء قاعدة البيانات إذا لم تكن موجودة
-CREATE DATABASE IF NOT EXISTS university_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE university_portal;
+-- جدول البرامج التكنولوجية (Departments)
+CREATE TABLE IF NOT EXISTS `departments` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `dept_name` VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
 
--- =============================================
--- 1. جدول المستخدمين (users)
--- يحتوي على بيانات الأدمن والطلاب معاً
--- =============================================
-CREATE TABLE IF NOT EXISTS users (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    name        VARCHAR(100)                        NOT NULL,
-    email       VARCHAR(100)                        NOT NULL UNIQUE,
-    password    VARCHAR(255)                        NOT NULL, -- يتم تخزين الهاش فقط باستخدام password_hash()
-    role        ENUM('admin', 'student')            NOT NULL,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- جدول المواد (Courses) مع عمود credit_hours
+CREATE TABLE IF NOT EXISTS `courses` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `code` VARCHAR(50) NOT NULL UNIQUE,
+  `description` TEXT,
+  `credit_hours` INT DEFAULT 3,
+  `dept_id` INT,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`dept_id`) REFERENCES `departments`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
--- إدراج حساب أدمن تجريبي (الباسورد: password — مشفر بـ BCRYPT)
-INSERT IGNORE INTO users (name, email, password, role)
-VALUES ('Super Admin', 'admin@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
+-- إدخال البرامج التكنولوجية
+INSERT INTO `departments` (dept_name) VALUES 
+('برنامج تكنولوجيا السكك الحديدية'),
+('برنامج تكنولوجيا المعلومات'),
+('برنامج تكنولوجيا تشغيل وصيانة معدات الغزل والنسيج'),
+('برنامج تكنولوجيا الصناعات الغذائية'),
+('برنامج تكنولوجيا الجرارات والمعدات الزراعية');
 
--- =============================================
--- 2. جدول الأقسام (departments)
--- =============================================
-CREATE TABLE IF NOT EXISTS departments (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    name        VARCHAR(100)    NOT NULL UNIQUE,
-    description TEXT,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- =============================================
--- 3. جدول الكورسات (courses)
--- code: كود المادة المختصر مثل CS101
--- department_id: مرتبط بجدول departments
--- =============================================
-CREATE TABLE IF NOT EXISTS courses (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    name            VARCHAR(150)    NOT NULL,
-    code            VARCHAR(20)     NOT NULL UNIQUE,      -- كود المادة (مثل CS101)
-    description     TEXT,
-    department_id   INT             NOT NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- Foreign Key: ربط المادة بالقسم مع الحذف التتالي
-    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
-);
-
--- =============================================
--- 4. جدول الأخبار والإعلانات (news)
--- created_by: المستخدم الأدمن الذي نشر الخبر
--- published_at: تاريخ النشر
--- =============================================
-CREATE TABLE IF NOT EXISTS news (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    title           VARCHAR(200)    NOT NULL,
-    content         TEXT            NOT NULL,
-    published_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by      INT             NOT NULL,
-    -- Foreign Key: ربط الخبر بالمستخدم (الأدمن) الذي أنشأه
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- =============================================
--- 5. جدول التسجيل في الكورسات (enrollments) — اختياري / Bonus
--- UNIQUE: يمنع الطالب من التسجيل مرتين في نفس المادة
--- =============================================
-CREATE TABLE IF NOT EXISTS enrollments (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    student_id  INT             NOT NULL,
-    course_id   INT             NOT NULL,
-    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (course_id)  REFERENCES courses(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_enrollment (student_id, course_id) -- منع التكرار
-);
+-- إضافة بعض المواد التجريبية
+INSERT INTO `courses` (name, code, description, credit_hours, dept_id) VALUES
+('شبكات الحاسوب', 'IT101', 'دراسة أساسيات شبكات الحاسوب والبروتوكولات', 3, 2),
+('أمن المعلومات', 'IT102', 'مبادئ أمن المعلومات والتشفير', 3, 2),
+('قواعد البيانات', 'IT103', 'تصميم وإدارة قواعد البيانات', 4, 2),
+('صيانة الجرارات', 'AG201', 'صيانة وإصلاح الجرارات الزراعية', 3, 5),
+('تصنيع الأغذية', 'FD301', 'عمليات تصنيع المواد الغذائية', 3, 4);
