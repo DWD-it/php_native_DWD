@@ -4,14 +4,13 @@
  */
 session_start();
 
-// Prevent caching to ensure secure logout
 header("Cache-Control: no-cache, no-store, must-revalidate");
 header("Pragma: no-cache");
 header("Expires: 0");
 
 function checkLogin() {
     if (!isset($_SESSION['user_id'])) {
-        header("Location: /university_portal/public/index.php");
+        header("Location: index.php");
         exit();
     }
 }
@@ -19,7 +18,7 @@ function checkLogin() {
 function checkAdmin() {
     checkLogin();
     if ($_SESSION['user_role'] !== 'admin') {
-        header("Location: /university_portal/public/student_dashboard.php");
+        header("Location: student_dashboard.php");
         exit();
     }
 }
@@ -27,7 +26,7 @@ function checkAdmin() {
 function checkStudent() {
     checkLogin();
     if ($_SESSION['user_role'] !== 'student') {
-        header("Location: /university_portal/public/admin_dashboard.php");
+        header("Location: admin_dashboard.php");
         exit();
     }
 }
